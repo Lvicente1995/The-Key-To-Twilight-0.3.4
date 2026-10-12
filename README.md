@@ -1,4 +1,4 @@
-# The Key to Twilight — v0.3.6
+# The Key to Twilight — v0.3.7
 
 ## Description
 
@@ -35,6 +35,7 @@ Open Dusklight's **Mods → The Key to Twilight** panel.
 | --- | --- | --- |
 | Keyblade | Native Ordon Sword, icons, text, sounds and behavior | Kingdom Key with the complete v0.2.3g feature set |
 | Character | Native Link and voice | Xion with Link's native animations and Xion vocal reactions |
+| Keyblade Rendering | Auto / Full Detail | Multiplayer Safe compact renderer for crowded Crests scenes |
 
 The settings are independent: Link + Ordon Sword, Link + Kingdom Key, Xion + Ordon Sword and Xion + Kingdom Key are supported combinations. Choices are saved across restarts and apply at the next mod update. Defaults are Kingdom Key and normal Link. Repairing or changing asset files requires a mod reload; changing these choices does not.
 
@@ -65,6 +66,8 @@ The universal bundle is intended to contain native libraries for every target in
 - Native frame interpolation, inventory-model rendering, custom shadow geometry, and mirror rendering are implemented.
 
 ## Current scope
+
+Version 0.3.7 adds a preemptive **Keyblade Rendering** control for crowded multiplayer scenes. `Multiplayer Safe` uses a compact 3,076-triangle Kingdom Key (down from 52,072) and omits the weapon's extra custom shadow, reflection and KH3 summon-mesh passes while preserving gameplay, chain simulation, audio, UI and the core weapon appearance. `Auto` can select this path under elevated Aurora index load; for reproducible Crests testing, choose `Multiplayer Safe` explicitly before summoning. See `PATCH_NOTES_v0.3.7.md` and `VALIDATION_v0.3.7.md`.
 
 Version 0.3.4 targets the sustained frame-rate drop while holding the Kingdom Key. Its immutable geometry now uses separate attribute arrays, reducing main-plus-shadow vertex-arena usage by 72.7%. Material constants and fine specular lookup tables are prepared once; measured CPU highlight calculation falls from roughly 6.35 ms to 4.20 ms per full-weapon view in the standalone benchmark. Every triangle, chain link and native light is retained. This is not an in-game FPS measurement. See `PATCH_NOTES_v0.3.4.md` and `VALIDATION_v0.3.4.md` for details and numerical-precision limits.
 
@@ -98,7 +101,7 @@ See `EXTENDING.md` for adding future choices without changing existing persisten
 
 Xion's jaw and brow weights follow the available native facial joints. Full KH3 facial animation, lip-sync and blinking are not implemented. Her fingers have a fixed closed grip; native Link hand-mesh swaps do not change her finger pose. The long coat preserves its separate front flaps. Its existing waist/thigh/shin skinning now guides a small custom cloth simulation in `src/xion_cloth.hpp`, with immutable pose snapshots shared by normal, shadow and mirror draws. It is not KH3's cloth solver. The inventory preview retains the static skinned coat. Missing or invalid `res/characters/xion/xion.cloth` falls back to that static coat and reports a warning; the mesh remains usable. The supplementary asset checks exact topology. `../model/characters/xion/generate_cloth.py` supports the retained JSON conversion; manual Blender topology changes also require remapping the source cloth weights before regeneration. See the model README. Extreme poses may still need weight or collision adjustment. The eye pupil is a documented static approximation of KH3's procedural pupil shader.
 
-`tools/kingdom-key-mesh.json` and `tools/export_mesh.py` regenerate `res/kingdom_key.mesh` with Python 3. `tools/convert_kh3_fx_meshes.py` and its validation report document conversion of the selected KHIII effect geometry.
+`tools/kingdom-key-mesh.json` and `tools/export_mesh.py` regenerate `res/kingdom_key.mesh` with Python 3. `tools/generate_keyblade_safe_lod.py` regenerates `res/kingdom_key_safe.mesh` for Multiplayer Safe rendering. `tools/convert_kh3_fx_meshes.py` and its validation report document conversion of the selected KHIII effect geometry.
 
 ## Cross-platform support
 
