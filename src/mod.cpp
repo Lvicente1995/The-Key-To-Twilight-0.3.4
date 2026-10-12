@@ -137,7 +137,7 @@ MOD_EXPORT ModResult mod_initialize(ModError* error) {
     if(!kingdom::customization::settings.initialize(mod_ctx,svc_config,svc_ui,configurationError))
         return mods::set_error(error,MOD_ERROR,configurationError.c_str());
     kingdom::customization::update();
-    svc_log->info(mod_ctx,"The Key to Twilight v0.3.5: multiplayer-safe local-player isolation for Xion and Kingdom Key; v0.3.4 performance/crash protections retained.");
+    svc_log->info(mod_ctx,"The Key to Twilight v0.3.6: adaptive index-pressure fallback for crowded multiplayer scenes; v0.3.5 local-player isolation retained.");
     rollback.committed=true;
     return MOD_OK;
 }

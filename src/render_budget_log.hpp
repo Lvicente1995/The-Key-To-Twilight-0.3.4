@@ -14,7 +14,7 @@ inline void logRenderBudget() {
     const auto v=stats->lastVertSize/band,s=stats->lastStorageSize/band,i=stats->lastIndexSize/band;
     if(v<=vertexBand&&s<=storageBand&&i<=indexBand)return;
     vertexBand=std::max(vertexBand,v);storageBand=std::max(storageBand,s);indexBand=std::max(indexBand,i);
-    const std::string message="Xion render budget (last completed frame): vertices="+
+    const std::string message="Aurora render budget (last completed frame): vertices="+
         std::to_string(stats->lastVertSize)+"/5242880, storage="+
         std::to_string(stats->lastStorageSize)+"/8388608, indices="+
         std::to_string(stats->lastIndexSize)+"/2097152 bytes.";

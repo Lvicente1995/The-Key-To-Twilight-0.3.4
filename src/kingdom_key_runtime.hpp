@@ -2,6 +2,7 @@
 #include "keyblade_arrays.hpp"
 #include "keyblade_highlight.hpp"
 #include "local_player.hpp"
+#include "aurora/gfx.h"
 // Retains the v0.2.3g weapon features with v0.3.4 attribute/highlight
 // optimizations. Character selection remains independent. Included after host
 // service imports and native hook declarations.
@@ -16,6 +17,35 @@ struct Part { std::string name;V3 pivot,tangent;std::vector<Vertex> vertices;std
 std::vector<Part> parts;
 highlight::MaterialCache highlightMaterials;
 bool staticArrayReadsPending=false;
+// Aurora has a separate 2 MiB per-frame index arena. Crests can bring that
+// arena close to exhaustion when multiple player models are visible. In that
+// situation keep the exact Kingdom Key geometry, but submit triangle vertices
+// through the regular GX stream so the draw uses vertex-arena headroom instead
+// of another large indexed allocation. This mode stays latched until the weapon
+// is dismissed so completed-frame statistics cannot make it oscillate.
+bool indexPressureFallback=false;
+constexpr std::uint32_t kIndexArenaBytes=2u*1024u*1024u;
+constexpr std::uint32_t kIndexSafetyReserve=96u*1024u;
+std::uint32_t keybladeIndexBytes() {
+    std::uint64_t bytes=0;
+    for(const auto& part:parts)bytes+=part.indices.size()*sizeof(u16);
+    return static_cast<std::uint32_t>(std::min<std::uint64_t>(bytes,0xffffffffu));
+}
+bool shouldEnterIndexPressureFallback() {
+    if(indexPressureFallback)return true;
+    const auto* stats=aurora_get_stats();
+    if(!stats)return false;
+    const std::uint64_t projected=std::uint64_t(stats->lastIndexSize)+keybladeIndexBytes()+kIndexSafetyReserve;
+    if(projected<=kIndexArenaBytes)return false;
+    indexPressureFallback=true;
+    if(svc_log) {
+        const std::string message="Kingdom Key: index-pressure fallback enabled (last frame "+
+            std::to_string(stats->lastIndexSize)+"/"+std::to_string(kIndexArenaBytes)+
+            " bytes; full weapon needs "+std::to_string(keybladeIndexBytes())+" index bytes).";
+        svc_log->info(mod_ctx,message.c_str());
+    }
+    return true;
+}
 void finishRenderingReads() {
     // GXSetArray keeps CPU pointers until the FIFO worker consumes them.
     // Geometry stays immutable across selections; drain only before teardown.
@@ -151,6 +181,7 @@ void clearInterpolation() {
 void resetPresence() {
     if(owner||chain.ready)clearInterpolation();
     presence.reset();summonEffects.reset();chain.ready=false;
+    indexPressureFallback=false;
     owner=nullptr;ownerModel=nullptr;hasHeldPose=false;held=false;
     activeDrawOwner=nullptr;activeDrawDepth=0;
     shieldGesture.reset();shieldOwner=nullptr;shieldBody=nullptr;shieldModel=nullptr;
@@ -342,7 +373,7 @@ void onExecute(ModContext*,void* args,void*,void*) {
     owner=link;ownerModel=model;lastActorPosition=actorPosition;
     if(!nowHeld) {
         if(chain.ready)clearInterpolation();
-        chain.ready=false;held=false;
+        chain.ready=false;held=false;indexPressureFallback=false;
         return;
     }
     V3 anchor=transform(matrix,localAnchor);
@@ -489,22 +520,44 @@ public:
             // arena. Dynamic highlights remain direct/FIFO-owned, so camera or
             // chain changes never require a blocking array-rewrite drain.
             staticArrayReadsPending=true;
-            GXBeginIndexed(GX_VTXFMT0,static_cast<u16>(part.vertices.size()),part.indices.data(),static_cast<u32>(part.indices.size()));
+            const bool fifoFallback=shouldEnterIndexPressureFallback();
+            if(!fifoFallback) {
+                GXBeginIndexed(GX_VTXFMT0,static_cast<u16>(part.vertices.size()),part.indices.data(),static_cast<u32>(part.indices.size()));
                 for(size_t vertexIndex=0;vertexIndex<part.vertices.size();++vertexIndex) {
                     const Vertex& x=part.vertices[vertexIndex];
                     GXPosition1x16(static_cast<u16>(vertexIndex));
                     GXNormal1x16(static_cast<u16>(vertexIndex));
                     GXColor1x16(static_cast<u16>(vertexIndex));
-                    // The supplied solid PBR materials retain their metalness and
-                    // roughness. Add a camera-dependent highlight to native diffuse.
                     V3 n=unit(rotate(view,x.normal));
                     V3 p=transform(view,x.position);
                     const V3 rgb=highlight::evaluate(n,p,highlightMaterials[part.materialIndex[vertexIndex]],highlightLights);
-                    // The original KHIII Key Fresnel particle supplies the
-                    // transition glow; retain the weapon's actual materials.
                     GXColor4u8(byte(rgb.x),byte(rgb.y),byte(rgb.z),255);
                 }
-            GXEnd();
+                GXEnd();
+            } else {
+                // Preserve the exact mesh and material/highlight result. The only
+                // change is how triangle references reach Aurora: ordinary FIFO
+                // data instead of GXBeginIndexed's constrained index arena.
+                constexpr size_t maxBatch=65535; // divisible by three
+                size_t offset=0;
+                while(offset<part.indices.size()) {
+                    const size_t count=std::min(maxBatch,part.indices.size()-offset);
+                    GXBegin(GX_TRIANGLES,GX_VTXFMT0,static_cast<u16>(count));
+                    for(size_t nIndex=0;nIndex<count;++nIndex) {
+                        const u16 vertexIndex=part.indices[offset+nIndex];
+                        const Vertex& x=part.vertices[vertexIndex];
+                        GXPosition1x16(vertexIndex);
+                        GXNormal1x16(vertexIndex);
+                        GXColor1x16(vertexIndex);
+                        V3 n=unit(rotate(view,x.normal));
+                        V3 p=transform(view,x.position);
+                        const V3 rgb=highlight::evaluate(n,p,highlightMaterials[part.materialIndex[vertexIndex]],highlightLights);
+                        GXColor4u8(byte(rgb.x),byte(rgb.y),byte(rgb.z),255);
+                    }
+                    GXEnd();
+                    offset+=count;
+                }
+            }
         }
         J3DShape::resetVcdVatCache();
     }
@@ -607,6 +660,7 @@ void onLinkDrawFinished(ModContext*,void* args,void*,void*) {
     auto* link=mods::arg<daAlink_c*>(args,0);
     if(!local_player::is(link))return;
     if(owner==link&&active(link)&&!link->checkWolf()&&summonEffects.active()
+        &&!indexPressureFallback
         &&!link->checkNoResetFlg2(daAlink_c::FLG2_STATUS_WINDOW_DRAW)) {
         if(auto* buffer=j3dSys.getDrawBuffer(1)) {
             auto& packet=effectPackets[effectPacketIndex++%effectPackets.size()];
@@ -624,6 +678,9 @@ HookAction onMirrorModelDraw(ModContext*,void* args,void*,void*) {
     auto* view=mods::arg<MtxP>(args,2);
     if(model!=gameplaySword||parts.empty())return HOOK_CONTINUE;
     if(!mirror||!view)return HOOK_CONTINUE;
+    // Under index pressure use the native, cheap sword reflection rather than
+    // submitting another full custom Kingdom Key view.
+    if(indexPressureFallback)return HOOK_CONTINUE;
     if(!gameplayPacket)return HOOK_SKIP_ORIGINAL;
     const auto& base=model->getBaseTRMtx();
     V3 origin{base[0][3],base[1][3],base[2][3]};
@@ -635,6 +692,9 @@ void onShadowImageDraw(ModContext*,void* args,void*,void*) {
     auto* shadow=mods::arg<dDlst_shadowReal_c*>(args,0);
     auto* view=mods::arg<MtxP>(args,1);
     if(!shadow||!view)return;
+    // A full custom silhouette is another complete indexed weapon submission.
+    // In crowded multiplayer frames retain the game's native inexpensive shadow.
+    if(indexPressureFallback) {ShadowImageDraw::g_orig(shadow,view);return;}
     if(!gameplaySword||parts.empty()||!shadow->mModelNum||shadow->mModelNum>38) {
         ShadowImageDraw::g_orig(shadow,view);return;
     }
