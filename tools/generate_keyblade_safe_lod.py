@@ -15,14 +15,18 @@ HERE = Path(__file__).resolve().parent
 SOURCE = HERE / 'kingdom-key-mesh.json'
 OUTPUT = HERE.parent / 'res' / 'kingdom_key_safe.mesh'
 TARGETS = {
-    'Gold_Guard': 700,
-    'Blade_and_Blue_Collar': 700,
-    'Gold_Upper_Collar': 250,
-    'Gold_Pommel': 250,
-    'Gold_Chain_Anchor': 60,
+    # Preserve the visually important silhouette much more aggressively than
+    # v0.3.7 while keeping the total safe mesh small enough for crowded Crests
+    # scenes. The chain stays intentionally cheap because its repeated links
+    # otherwise dominate the weapon's triangle count.
+    'Gold_Guard': 1500,
+    'Blade_and_Blue_Collar': 2000,
+    'Gold_Upper_Collar': 500,
+    'Gold_Pommel': 500,
+    'Gold_Chain_Anchor': 100,
     'Black_Grip': 96,
-    'Mickey_Charm': 180,
-    **{f'Chain_{i:02d}': 36 for i in range(1, 15)},
+    'Mickey_Charm': 600,
+    **{f'Chain_{i:02d}': 28 for i in range(1, 15)},
 }
 
 def simplify(mesh: dict, target: int, use_normals: bool) -> dict:

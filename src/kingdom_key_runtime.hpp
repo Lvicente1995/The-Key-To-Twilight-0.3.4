@@ -18,9 +18,9 @@ struct Part { std::string name;V3 pivot,tangent;std::vector<Vertex> vertices;std
 std::vector<Part> parts;
 highlight::MaterialCache highlightMaterials;
 bool staticArrayReadsPending=false;
-// Multiplayer Safe keeps the exact full-detail Kingdom Key. The v0.3.7 safe
-// asset remains loaded only for provenance/backward comparison and is not used
-// by the renderer.
+// Multiplayer Safe uses a silhouette-preserving quality LOD. The important
+// blade/guard/charm shapes keep substantially more detail than the v0.3.7 test
+// mesh, while repeated chain geometry stays intentionally cheap.
 std::vector<Part> safeParts;
 highlight::MaterialCache safeHighlightMaterials;
 KeybladeRenderMode renderMode=KeybladeRenderMode::Auto;
@@ -35,7 +35,7 @@ bool shouldUseSafeRendering() {
     if(stats&&stats->lastIndexSize>=kAutoSafeIndexThreshold) {
         safeRenderLatched=true;
         if(svc_log) {
-            const std::string message="Kingdom Key: full-detail streamed Multiplayer Safe renderer auto-enabled (last completed frame indices="+
+            const std::string message="Kingdom Key: quality Multiplayer Safe renderer auto-enabled (last completed frame indices="+
                 std::to_string(stats->lastIndexSize)+"/2097152 bytes).";
             svc_log->info(mod_ctx,message.c_str());
         }
@@ -46,7 +46,7 @@ void setRenderMode(KeybladeRenderMode mode) {
     renderMode=mode;
     safeRenderLatched=(mode==KeybladeRenderMode::MultiplayerSafe);
     if(svc_log&&safeRenderLatched)
-        svc_log->info(mod_ctx,"Kingdom Key: full-detail streamed Multiplayer Safe renderer forced by mod setting.");
+        svc_log->info(mod_ctx,"Kingdom Key: quality Multiplayer Safe renderer forced by mod setting.");
 }
 void finishRenderingReads() {
     // GXSetArray keeps CPU pointers until the FIFO worker consumes them.
@@ -420,8 +420,6 @@ public:
     bool interpolate=false;
     bool castsShadow=true;
     bool safeRender=false;
-    struct StreamColor {u8 r,g,b,a;};
-    std::vector<StreamColor> streamColors;
     void presentationMatrices(Mtx out[32]) const {
         for(size_t i=0;i<parts.size();++i) {
             if(!interpolate||!svc_interp->lookup_replacement_mtx(simulatedParts[i],out[i]))
@@ -439,8 +437,8 @@ public:
     }
     void draw() override {drawInView(j3dSys.getViewMtx());}
     void drawInView(const Mtx drawView) {
-        const auto& geometry=parts;
-        const auto& materials=highlightMaterials;
+        const auto& geometry=(safeRender&&!safeParts.empty())?safeParts:parts;
+        const auto& materials=(safeRender&&!safeParts.empty())?safeHighlightMaterials:highlightMaterials;
         if(geometry.empty())return;
         Mtx world[32];presentationMatrices(world);
         j3dSys.reinitGX();
@@ -524,49 +522,18 @@ public:
             GXSetArray(GX_VA_NRM,arrays.normals.data(),static_cast<u32>(arrays.normals.size()*sizeof(keyblade_arrays::Vector)),sizeof(keyblade_arrays::Vector),keyblade_arrays::littleEndian);
             GXSetArray(GX_VA_CLR0,arrays.colors.data(),static_cast<u32>(arrays.colors.size()*sizeof(keyblade_arrays::Color)),sizeof(keyblade_arrays::Color),keyblade_arrays::littleEndian);
             staticArrayReadsPending=true;
-            if(!safeRender) {
-                GXBeginIndexed(GX_VTXFMT0,static_cast<u16>(part.vertices.size()),part.indices.data(),static_cast<u32>(part.indices.size()));
-                for(size_t vertexIndex=0;vertexIndex<part.vertices.size();++vertexIndex) {
-                    const Vertex& x=part.vertices[vertexIndex];
-                    GXPosition1x16(static_cast<u16>(vertexIndex));
-                    GXNormal1x16(static_cast<u16>(vertexIndex));
-                    GXColor1x16(static_cast<u16>(vertexIndex));
-                    V3 n=unit(rotate(view,x.normal));
-                    V3 p=transform(view,x.position);
-                    const V3 rgb=highlight::evaluate(n,p,materials[part.materialIndex[vertexIndex]],highlightLights);
-                    GXColor4u8(byte(rgb.x),byte(rgb.y),byte(rgb.z),255);
-                }
-                GXEnd();
-            } else {
-                // Same full-detail geometry/materials. Only the submission path
-                // changes: ordinary GXBegin triangle batches avoid Aurora's
-                // constrained host index arena. Highlights are still evaluated
-                // once per unique vertex, then replayed for triangle references.
-                streamColors.resize(part.vertices.size());
-                for(size_t vertexIndex=0;vertexIndex<part.vertices.size();++vertexIndex) {
-                    const Vertex& x=part.vertices[vertexIndex];
-                    V3 n=unit(rotate(view,x.normal));
-                    V3 p=transform(view,x.position);
-                    const V3 rgb=highlight::evaluate(n,p,materials[part.materialIndex[vertexIndex]],highlightLights);
-                    streamColors[vertexIndex]={byte(rgb.x),byte(rgb.y),byte(rgb.z),255};
-                }
-                constexpr size_t maxBatch=65535;
-                size_t offset=0;
-                while(offset<part.indices.size()) {
-                    const size_t count=std::min(maxBatch,part.indices.size()-offset);
-                    GXBegin(GX_TRIANGLES,GX_VTXFMT0,static_cast<u16>(count));
-                    for(size_t nIndex=0;nIndex<count;++nIndex) {
-                        const u16 vertexIndex=part.indices[offset+nIndex];
-                        const auto& c=streamColors[vertexIndex];
-                        GXPosition1x16(vertexIndex);
-                        GXNormal1x16(vertexIndex);
-                        GXColor1x16(vertexIndex);
-                        GXColor4u8(c.r,c.g,c.b,c.a);
-                    }
-                    GXEnd();
-                    offset+=count;
-                }
+            GXBeginIndexed(GX_VTXFMT0,static_cast<u16>(part.vertices.size()),part.indices.data(),static_cast<u32>(part.indices.size()));
+            for(size_t vertexIndex=0;vertexIndex<part.vertices.size();++vertexIndex) {
+                const Vertex& x=part.vertices[vertexIndex];
+                GXPosition1x16(static_cast<u16>(vertexIndex));
+                GXNormal1x16(static_cast<u16>(vertexIndex));
+                GXColor1x16(static_cast<u16>(vertexIndex));
+                V3 n=unit(rotate(view,x.normal));
+                V3 p=transform(view,x.position);
+                const V3 rgb=highlight::evaluate(n,p,materials[part.materialIndex[vertexIndex]],highlightLights);
+                GXColor4u8(byte(rgb.x),byte(rgb.y),byte(rgb.z),255);
             }
+            GXEnd();
         }
         J3DShape::resetVcdVatCache();
     }

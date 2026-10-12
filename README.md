@@ -1,4 +1,4 @@
-# The Key to Twilight — v0.3.8
+# The Key to Twilight — v0.3.9
 
 ## Description
 
@@ -67,7 +67,7 @@ The universal bundle is intended to contain native libraries for every target in
 
 ## Current scope
 
-Version 0.3.8 replaces the crude multiplayer LOD with a **full-detail streamed renderer**. `Multiplayer Safe` now keeps the normal 52,072-triangle Kingdom Key and restores the KH3 summon effect, but submits both weapon and summon meshes without `GXBeginIndexed` so they do not consume Aurora's constrained 2 MiB index arena. The extra custom weapon shadow and mirror/reflection passes remain disabled in Multiplayer Safe to preserve headroom. `Auto` may select the streamed path under elevated index load; for reproducible Crests testing, choose `Multiplayer Safe` explicitly before summoning. See `PATCH_NOTES_v0.3.8.md` and `VALIDATION_v0.3.8.md`.
+Version 0.3.9 replaces the unstable full-detail streaming experiment with a **quality multiplayer LOD**. `Multiplayer Safe` now uses a silhouette-preserving 5,676-triangle Kingdom Key (about 89% fewer triangles than Full Detail), while the KH3 summon effect is restored through a lightweight streamed FX path. Custom weapon shadow and mirror/reflection passes remain disabled in Multiplayer Safe to preserve Aurora render-buffer headroom. `Full Detail` keeps the normal 52,072-triangle Kingdom Key for solo/light scenes. See `PATCH_NOTES_v0.3.9.md` and `VALIDATION_v0.3.9.md`.
 
 Version 0.3.4 targets the sustained frame-rate drop while holding the Kingdom Key. Its immutable geometry now uses separate attribute arrays, reducing main-plus-shadow vertex-arena usage by 72.7%. Material constants and fine specular lookup tables are prepared once; measured CPU highlight calculation falls from roughly 6.35 ms to 4.20 ms per full-weapon view in the standalone benchmark. Every triangle, chain link and native light is retained. This is not an in-game FPS measurement. See `PATCH_NOTES_v0.3.4.md` and `VALIDATION_v0.3.4.md` for details and numerical-precision limits.
 

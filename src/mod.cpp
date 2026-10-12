@@ -137,7 +137,7 @@ MOD_EXPORT ModResult mod_initialize(ModError* error) {
     if(!kingdom::customization::settings.initialize(mod_ctx,svc_config,svc_ui,configurationError))
         return mods::set_error(error,MOD_ERROR,configurationError.c_str());
     kingdom::customization::update();
-    svc_log->info(mod_ctx,"The Key to Twilight v0.3.8: full-detail streamed Multiplayer Safe Kingdom Key with KH3 summon effects restored.");
+    svc_log->info(mod_ctx,"The Key to Twilight v0.3.9: quality Multiplayer Safe Kingdom Key LOD with KH3 summon effects restored.");
     rollback.committed=true;
     return MOD_OK;
 }

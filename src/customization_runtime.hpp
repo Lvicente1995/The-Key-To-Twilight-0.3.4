@@ -108,7 +108,7 @@ void apply(const selections::Selection& requested) {
     if(status.empty()) {
         status="Selections apply immediately. Armor abilities stay unchanged.";
         if(applied.keyblade==KeybladeSelection::KingdomKey&&applied.rendering==KeybladeRenderMode::MultiplayerSafe)
-            status+=" Multiplayer Safe keeps the full-detail Kingdom Key and summon effect using streamed rendering; custom weapon shadow/reflection are omitted for headroom.";
+            status+=" Multiplayer Safe uses a quality-preserving Kingdom Key LOD and keeps the summon effect; custom weapon shadow/reflection are omitted for headroom.";
     }
     if(applied.keyblade==KeybladeSelection::KingdomKey&&!keybladeWarning.empty())
         status+='\n'+keybladeWarning;
