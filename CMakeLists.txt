@@ -8,7 +8,7 @@ if (NOT DEFINED CMAKE_BUILD_TYPE AND NOT DEFINED ENV{CMAKE_BUILD_TYPE})
     set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type")
 endif ()
 
-project(kingdom_key VERSION 0.3.7 LANGUAGES CXX)
+project(kingdom_key VERSION 0.3.8 LANGUAGES CXX)
 
 # Pin to the known-good Dusklight SDK/game-header commit used by v0.2.1.
 # Override with -DDUSKLIGHT_DIR=/path/to/dusklight for a local checkout.

@@ -351,13 +351,13 @@ inline bool loadAssets(const ResourceService* service,ModContext* context,std::s
     assets.ready=true;error.clear();return true;
 }
 class Packet final:public J3DPacket {
-    Snapshot data_{};float interpolation_=1;
+    Snapshot data_{};float interpolation_=1;bool streamMeshes_=false;
     static V3 direction(const Mtx m,V3 p){return {m[0][0]*p.x+m[0][1]*p.y+m[0][2]*p.z,m[1][0]*p.x+m[1][1]*p.y+m[1][2]*p.z,m[2][0]*p.x+m[2][1]*p.y+m[2][2]*p.z};}
     static V3 point(const Mtx m,V3 p){return direction(m,p)+V3{m[0][3],m[1][3],m[2][3]};}
     static u8 channel(float v){return u8(saturate(v)*255+.5f);}
     static void vertex(V3 p,V3 color,float alpha,float u,float v) {GXPosition3f32(p.x,p.y,p.z);GXColor4u8(channel(color.x),channel(color.y),channel(color.z),channel(alpha));GXTexCoord2f32(u,v);}
 public:
-    void set(const Snapshot& s,float interpolation=1){data_=s;interpolation_=interpolation;}
+    void set(const Snapshot& s,float interpolation=1,bool streamMeshes=false){data_=s;interpolation_=interpolation;streamMeshes_=streamMeshes;}
     void draw() override {drawInView(j3dSys.getViewMtx());}
     void drawInView(const Mtx view) const {
         if(!assets.ready)return;const Frame frame=data_.sample(interpolation_);if(!frame.count)return;
@@ -402,12 +402,26 @@ public:
             }
             if(mesh) {
                 const bool fresnel=p.definition==1;
-                GXBeginIndexed(GX_VTXFMT0,u16(mesh->vertices.size()),mesh->indices.data(),u32(mesh->indices.size()));
-                for(const auto& v:mesh->vertices) {
+                auto emit=[&](const auto& v) {
                     float alpha=p.alpha*float(v.color[3])/255;
                     if(fresnel){const V3 n=unit(b.direction(v.normal),{0,0,1});const float edge=1-std::abs(dot(n,unit(center,{0,0,-1})));alpha*=edge*edge;}
                     vertex(b.point(product(v.position,p.size)),product(color,{v.color[0]/255.0f,v.color[1]/255.0f,v.color[2]/255.0f}),alpha,v.u*mat.u+p.uvOffset.x,v.v*mat.v+p.uvOffset.y);
-                }GXEnd();
+                };
+                if(!streamMeshes_) {
+                    GXBeginIndexed(GX_VTXFMT0,u16(mesh->vertices.size()),mesh->indices.data(),u32(mesh->indices.size()));
+                    for(const auto& v:mesh->vertices)emit(v);
+                    GXEnd();
+                } else {
+                    constexpr std::size_t maxBatch=65535;
+                    std::size_t offset=0;
+                    while(offset<mesh->indices.size()) {
+                        const std::size_t count=std::min(maxBatch,mesh->indices.size()-offset);
+                        GXBegin(GX_TRIANGLES,GX_VTXFMT0,u16(count));
+                        for(std::size_t j=0;j<count;++j)emit(mesh->vertices[mesh->indices[offset+j]]);
+                        GXEnd();
+                        offset+=count;
+                    }
+                }
             } else {
                 const float width=p.size.x*.5f,height=p.size.y*.5f;
                 const V3 corners[4]={b.point({0,-width,-height}),b.point({0,width,-height}),b.point({0,width,height}),b.point({0,-width,height})};

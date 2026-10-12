@@ -94,7 +94,7 @@ class System {
         control.config_var = self.rendering_;
         control.options = kKeybladeRenderOptions;
         control.option_count = sizeof(kKeybladeRenderOptions) / sizeof(*kKeybladeRenderOptions);
-        control.tooltip = "Multiplayer Safe uses a lightweight Kingdom Key and omits extra weapon render passes for crowded Crests of Courage scenes.";
+        control.tooltip = "Multiplayer Safe keeps the full-detail Kingdom Key and summon effect, but streams them without the constrained index arena; custom weapon shadow/reflection are omitted for headroom.";
         result = self.ui_->pane_add_control(self.context_, pane, &control, nullptr);
         if (result != MOD_OK)
             return mods::set_error(error, result, "Could not build the Keyblade rendering choice.");

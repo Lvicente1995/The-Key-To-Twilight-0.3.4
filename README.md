@@ -1,4 +1,4 @@
-# The Key to Twilight — v0.3.7
+# The Key to Twilight — v0.3.8
 
 ## Description
 
@@ -67,7 +67,7 @@ The universal bundle is intended to contain native libraries for every target in
 
 ## Current scope
 
-Version 0.3.7 adds a preemptive **Keyblade Rendering** control for crowded multiplayer scenes. `Multiplayer Safe` uses a compact 3,076-triangle Kingdom Key (down from 52,072) and omits the weapon's extra custom shadow, reflection and KH3 summon-mesh passes while preserving gameplay, chain simulation, audio, UI and the core weapon appearance. `Auto` can select this path under elevated Aurora index load; for reproducible Crests testing, choose `Multiplayer Safe` explicitly before summoning. See `PATCH_NOTES_v0.3.7.md` and `VALIDATION_v0.3.7.md`.
+Version 0.3.8 replaces the crude multiplayer LOD with a **full-detail streamed renderer**. `Multiplayer Safe` now keeps the normal 52,072-triangle Kingdom Key and restores the KH3 summon effect, but submits both weapon and summon meshes without `GXBeginIndexed` so they do not consume Aurora's constrained 2 MiB index arena. The extra custom weapon shadow and mirror/reflection passes remain disabled in Multiplayer Safe to preserve headroom. `Auto` may select the streamed path under elevated index load; for reproducible Crests testing, choose `Multiplayer Safe` explicitly before summoning. See `PATCH_NOTES_v0.3.8.md` and `VALIDATION_v0.3.8.md`.
 
 Version 0.3.4 targets the sustained frame-rate drop while holding the Kingdom Key. Its immutable geometry now uses separate attribute arrays, reducing main-plus-shadow vertex-arena usage by 72.7%. Material constants and fine specular lookup tables are prepared once; measured CPU highlight calculation falls from roughly 6.35 ms to 4.20 ms per full-weapon view in the standalone benchmark. Every triangle, chain link and native light is retained. This is not an in-game FPS measurement. See `PATCH_NOTES_v0.3.4.md` and `VALIDATION_v0.3.4.md` for details and numerical-precision limits.
 
