@@ -1,0 +1,15 @@
+2026-10-12 — final focused cloth regression, MSVC /O2 /std:c++20
+PASS: 9000 recorded pose records advanced at 1/30 second per record.
+PASS: 161770 vertex samples checked; 42959 positions displaced.
+PASS: maximum correction 9.20945 cm; all outputs finite.
+PASS: repeated immutable-snapshot apply produces identical output.
+PASS: every unmasked vertex is byte-identical to original skinned output.
+PASS: preview no-op, malformed/mismatched resources, teleport/invalid-pose reset.
+PASS: all seven post-cloth outputs fit relative S16 through xion_compact.hpp.
+PASS: seven broad boot+shin/coat triangle checks: all zero after cloth.
+Record 4874: 177 crossing triangle pairs before cloth, 0 after cloth.
+Observed standalone apply mean: 3.08309 ms over seven poses.
+Observed full test duration: 2.05143 s. Not an in-game FPS benchmark.
+Mesh unchanged: a4851fd1d5cdbed842504fa32a6e11d5553e33d0eee4fdc5e78257cb40dc646a
+Mask SHA256: b45580ad58627b58b248040b4562ff021691cd652871dc7c5c7de9ea98e334b6
+Scope and remaining runtime checks: XION_CLOTH_VALIDATION.md

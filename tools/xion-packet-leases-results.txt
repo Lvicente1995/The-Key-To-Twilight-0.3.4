@@ -1,0 +1,9 @@
+2026-10-12 — MSVC /O2 /std:c++20
+PASS: Eight queued slots cannot be overwritten by a ninth capture.
+PASS: 100 repeated list traversals preserve eight nodes without cycles.
+PASS: Resetting an unrelated draw buffer cannot release a slot.
+PASS: Opaque reset alone cannot release a slot still owned by the translucent buffer.
+PASS: Both buffer resets allow reuse; opaque-only and shared-buffer leases retire correctly.
+PASS: Failed captures can cancel a lease before submission; null ownership is rejected.
+Integration: J3DDrawBuffer::frameInit post-hook is the sole queue-retirement event.
+No new live game result is implied by this standalone regression.

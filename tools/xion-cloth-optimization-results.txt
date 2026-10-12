@@ -1,0 +1,5 @@
+2026-10-12 — MSVC /O2 /std:c++20, comparison with v0.3.2
+PASS 100000 capsule projections; 9000 snapshots; 97 poses / 2241670 skinned positions+normals byte-identical to v0.3.2
+448 alternating apply samples each: baseline 3.11501 ms, optimized 1.56582 ms, speedup 1.98937x (standalone CPU, not game FPS)
+Existing regression: PASS 9000 recorded ticks; 161770 vertices checked; 42959 displaced; maximum displacement 9.20945 cm; apply mean 1.54379 ms; total 1.44865 s
+No simulation parameter, mesh, mask, material or texture changes.

@@ -1,0 +1,6 @@
+PASS indexed attribute strides/fetches, uniform color+alpha registers, varying color+alpha fallback, F32 UV/position fallback, no pose-array reallocations, invalid values
+PASS actual mesh: 85110 triangle corners identical to compact direct attributes
+Vertex arena main=138660, shadow=46108, total=184768 bytes
+Storage arena main=300430, shadow=137740, total=438170 bytes
+Index arena main=170220, shadow=167640, total=337860 bytes (unchanged)
+Budgets exclude alignment; storage estimates count one upload per bound attribute per material/pass.

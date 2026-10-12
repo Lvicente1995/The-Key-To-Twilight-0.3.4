@@ -1,0 +1,11 @@
+2026-10-12 — MSVC /O2 /std:c++20
+parts 16, unique vertices 26131, active lights 7, validation samples 418096
+Original mean highlight milliseconds per mesh/view: 6.35460
+Cached exponent/F0/light data: 6.08243
+Cached plus multiplication Fresnel: 5.31268
+Production lookup plus multiplication Fresnel: 4.20366
+Cached exact-pow RGB: bit-identical.
+Fresnel multiply: 1677 float triples differ; max RGB delta 0.0000305176; 0 final-byte differences.
+Production helper: 246199 float triples differ; max RGB delta 0.000839233; 9 channel-byte differences; maximum final-byte error 1.
+PASS: six material tables, seven active lights, endpoints, out-of-domain std::pow fallback.
+Fixture-specific precision results; standalone CPU timing, not live FPS or a universal numerical bound.

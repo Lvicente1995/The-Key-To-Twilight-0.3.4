@@ -1,0 +1,211 @@
+{
+  "baseline": "Delivered The Key to Twilight v0.3.1; original v0.2.3g protected file list retained",
+  "all_existing_runtime_resources_unchanged": true,
+  "all_existing_blender_projects_unchanged": true,
+  "checks": [
+    {
+      "file": "res/banner.png",
+      "sha256": "d18cc8deeafdc86b6b89107d743dd5d4d253d7ddbabbcc92bc643cabd789165b"
+    },
+    {
+      "file": "res/icon.png",
+      "sha256": "6dc3145ceb2ea296db3e5b19eabaf6af4533a554f0fa273d58381ce68f1c5879"
+    },
+    {
+      "file": "res/kingdom_key.mesh",
+      "sha256": "0c8ab14aae7b2eaaf49b1be4c267f37bb7c3afde174f05d6755f2896b8519a08"
+    },
+    {
+      "file": "res/kingdom_key_dismiss.wav",
+      "sha256": "0368575f6270827680a7f1473cf630ff2aa504c08ff20f8042927c63b3261657"
+    },
+    {
+      "file": "res/kingdom_key_hit.wav",
+      "sha256": "30e014184380310e80fe39bb14a2bb08b24e91a4624305371b7509a28fc78892"
+    },
+    {
+      "file": "res/kingdom_key_hit_02.wav",
+      "sha256": "a31dc22838df1632568427cd916816be1a903324115d553afc94513d2ca14b32"
+    },
+    {
+      "file": "res/kingdom_key_hit_03.wav",
+      "sha256": "c6c8156c9ecb9a71fc97237b5e6ffe25828da988da0e4db0be31462104656270"
+    },
+    {
+      "file": "res/kingdom_key_hit_04.wav",
+      "sha256": "1f84e080cf32bee4a590a2a66c90c692ecd1aa92806a4b8688cbf0dead464cde"
+    },
+    {
+      "file": "res/kingdom_key_hit_05.wav",
+      "sha256": "7d1416a850ad0cd43248dba01fbf98020ec3e98c7c5223eeb6c4d5d30756385d"
+    },
+    {
+      "file": "res/kingdom_key_hit_06.wav",
+      "sha256": "5c9652c9d8a9097e1eccfd1ca78aeacca478b0a69dcbda58708a0f459e662075"
+    },
+    {
+      "file": "res/kingdom_key_hit_07.wav",
+      "sha256": "4410ec7f11282ff1fb925e29c9f2beb4794a8342d9cc03db49bf354df89f0762"
+    },
+    {
+      "file": "res/kingdom_key_summon.wav",
+      "sha256": "0368575f6270827680a7f1473cf630ff2aa504c08ff20f8042927c63b3261657"
+    },
+    {
+      "file": "res/kh3fx/jtx_1dot_wht_00m.rgba",
+      "sha256": "421ded760a91f5ab174086ad3de2347804041f60d0159e228b5c52d8d3512fe8"
+    },
+    {
+      "file": "res/kh3fx/jtx_crs_03a.rgba",
+      "sha256": "e38ff1d4ebb0466112d6595bd2b489b0fcceb44145af7088a56b54df804e17b3"
+    },
+    {
+      "file": "res/kh3fx/jtx_glt_05a_clamp.rgba",
+      "sha256": "4db36e3b298d46478fb040b3585e195066dd6eeeae8c3e42e0a5bf9c39ce64bd"
+    },
+    {
+      "file": "res/kh3fx/jtx_glw_01a_clamp.rgba",
+      "sha256": "7d30df9565f355f5981c1cc51fc768225e71bdc72a8f56f80bd9f5e988fd6b11"
+    },
+    {
+      "file": "res/kh3fx/jtx_glw_01m_clamp.rgba",
+      "sha256": "ba4e3920d57a695185d329dd3a2c0cf9dcc9c5d4e990c04f603339d6d43429a6"
+    },
+    {
+      "file": "res/kh3fx/jtx_grdb_02a.rgba",
+      "sha256": "0d9320b5861360a5394cabfc23292be984ccd6fcd12aabc35179440a4a8aa0cf"
+    },
+    {
+      "file": "res/kh3fx/jtx_sho_00a.rgba",
+      "sha256": "18fc80ef6766a78d6d664d9b1bd89515a4577746ddec28f9879270602bb94059"
+    },
+    {
+      "file": "res/kh3fx/jtx_sho_00m.rgba",
+      "sha256": "96a7b0d6982d1e2846a1d6d44d4969814a09ccb2e44c6b4d46f92daee4fa837c"
+    },
+    {
+      "file": "res/kh3fx/material-parameters.json",
+      "sha256": "3c24d3c5460cfc76394d64b59dd5389d6c1d114869a7503fddbc6d7d147f3223"
+    },
+    {
+      "file": "res/kh3fx/materials.txt",
+      "sha256": "691ce34ff97e847d8c8f6464e95a98d7ebd1d79e95f0d960b204111571c9b824"
+    },
+    {
+      "file": "res/kh3fx/meshes.bin",
+      "sha256": "72aa584ad9e6c4b6c2ad8a465563362dbff77b1797c0c655449880e3b177b882"
+    },
+    {
+      "file": "res/kh3fx/otx_fls_00m.rgba",
+      "sha256": "0c7d501402da0c1ca49eda69f19a328e71cfd0b50fa7d63191259c04603a3f7f"
+    },
+    {
+      "file": "res/kh3fx/otx_grd_01m.rgba",
+      "sha256": "45ccf595009061dd51f0bedb0fbd5cbf5d68fb33c83257818ec568796be9a5ac"
+    },
+    {
+      "file": "res/kh3fx/stx_ora_01m.rgba",
+      "sha256": "8036a1eeba92602bd3a9cb11eb277cb97c3d243d34491a973a4dde00081279f9"
+    },
+    {
+      "file": "res/kh3fx/stx_rng_00a.rgba",
+      "sha256": "9c86bad8c4afa566010f8a4c8baad38b099142dd3721688bd270632c1f25917e"
+    },
+    {
+      "file": "res/kh3fx/textures.json",
+      "sha256": "46994085e2f70adb75f9ad031b122868d2d792dbf44e2975179c504aee7e252e"
+    },
+    {
+      "file": "res/kh3fx/ttx_fls_02a.rgba",
+      "sha256": "10c514f4f0928262d5e9f81d7fcd49ab72a70e2cbd3d9cd008cb430ad608fb73"
+    },
+    {
+      "file": "res/kh3fx/ztx_glt_00a.rgba",
+      "sha256": "1e2cf48bbbcb4e4a578a95bed01f972b19b8b76bdb39785786014723a8960cf6"
+    },
+    {
+      "file": "res/ui/tex1_48x48_7a16cbeebf26f7d6_3b746898124fa62c_9.png",
+      "sha256": "875709a8a2004a246abee2c9ca709c05deb4f197d2514540ad9b942c042a9ce9"
+    },
+    {
+      "file": "src/keyblade_audio.hpp",
+      "sha256": "41672eaad7894ebb2439a5d197be82cc0d681bb1d010db189c764fac6d344099"
+    },
+    {
+      "file": "src/chain_physics.hpp",
+      "sha256": "337c5e30a1969ca3d9ab50e09f0a07ade5566f229e3c60a3d9cd775fe297726c"
+    },
+    {
+      "file": "src/keyblade_presence.hpp",
+      "sha256": "4e80b57b74d06bddb101f6c318b72d0a25c88f5c0d92b8610be7fe9dc4a18d69"
+    },
+    {
+      "file": "src/shield_gesture.hpp",
+      "sha256": "6bdeb4756445ef12ca000c41ffda68570b9d61952eff171cda9980db2220d821"
+    },
+    {
+      "file": "src/kh3_fx.hpp",
+      "sha256": "9f4b7ed74fd210fdfa6217d81bf42999629ada2d66f23ea306280fbf3d6e67f6"
+    },
+    {
+      "file": "src/kh3_fx_data.hpp",
+      "sha256": "2d9f5dd512c0f25dd38120f63543154999553c7cbde454c9418d80228051f98b"
+    },
+    {
+      "file": "src/keyblade_ui.hpp",
+      "sha256": "643e7385aabf7d85766636d6be9fa2ec34af5c743eed0c83a8670d8cc56264d5"
+    },
+    {
+      "file": "src/keyblade_text.hpp",
+      "sha256": "4bb43c43779aa941596c1d5d679306bfdae7870090503e560fe5042adaddc23e"
+    },
+    {
+      "file": ".github/workflows/build.yml",
+      "sha256": "d7e266696aa8444ebf7de07b773bc32a298b48625c1947f99fca302170be3eaa"
+    },
+    {
+      "file": "cmake/FetchDusklight.cmake",
+      "sha256": "1e0fe78564aa61bdbfd9747464670834d58f935a622fbb871025466a3c738714"
+    },
+    {
+      "file": ".gitattributes",
+      "sha256": "d24ed554ce0c28a94e8b85e3d6e8733f0d0890736cfd042cfbf5f2fdae7c0a27"
+    },
+    {
+      "file": "tools/merge_mod.py",
+      "sha256": "04f828af7bad3e234a62eedec5648902e2ca3706a0d97b6b48cd8cffa27fa120"
+    },
+    {
+      "file": "src/kingdom_key_runtime.hpp",
+      "sha256": "3263cad5b3edbcfbb91dd2a306ef7f2067bb23aff32e3efaf2db17c6e28b2b02"
+    },
+    {
+      "file": "src/keyblade_selection.hpp",
+      "sha256": "ea257b435003c4aaa200f055764fa0f1b55f5ef3dd2e4c87d4ee853bed5ce512"
+    },
+    {
+      "file": "src/character_selection.hpp",
+      "sha256": "16b939cbbfa3509d2f4efe7892733679cc977585138b46e8f32ab0728fb3a827"
+    },
+    {
+      "file": "src/customization_config.hpp",
+      "sha256": "95775db0fee93f070795765f9dc965e53c86eb048e5a4a48828e37f023733983"
+    },
+    {
+      "file": "src/character_voice.hpp",
+      "sha256": "6c72e9e84f91723737608f8c34c0537f04789bde75bb04637d401c7da6c0f6e6"
+    },
+    {
+      "file": "src/character_voice_mapping.hpp",
+      "sha256": "fea75a52ea7a4139f0beadbc5b42ebfc9cf23a6e46742442e019b2426d9ef032"
+    },
+    {
+      "file": "src/xion_model.hpp",
+      "sha256": "328e47fa94fe0ef31b31a60d495dc48690539d76b64a33a8cd2c88448b407e0f"
+    },
+    {
+      "file": "src/xion_cloth.hpp",
+      "sha256": "83a3a82f1fb99126ba00fabc2f01a78789a8ac5072e3a39c16700666305ea767"
+    }
+  ]
+}

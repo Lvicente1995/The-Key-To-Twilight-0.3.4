@@ -1,0 +1,5 @@
+PASS fixed-point bounds, NaN/infinity rejection, independent F32 fallbacks, 10000 translated/reflected views
+max local position error cm=0.0078125, UV=3.05176e-05, F32 view-space error cm=0.024704
+PASS actual mesh 23110 vertices, 12 materials; all source UV/position values fit
+vertex bytes excluding at most3 alignment bytes per draw: main 623970 -> 392870, shadow 276648 -> 138908, combined 900618 -> 531778
+PASS 184880 skinned samples across8 actual captured poses, no F32 fallback required

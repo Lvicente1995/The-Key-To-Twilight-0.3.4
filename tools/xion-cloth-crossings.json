@@ -1,0 +1,42 @@
+{
+  "scope": "Boots AND shin/upper-boot surfaces (all material11 faces max restY<50cm) against coat max restY<105cm. Seven captured poses, actual C++ cloth output; strict noncoplanar triangle crossings.",
+  "coat_triangles": 2656,
+  "lower_leg_triangles": 1397,
+  "poses": [
+    {
+      "record": 2303,
+      "before_crossing_pairs": 0,
+      "after_crossing_pairs": 0
+    },
+    {
+      "record": 3080,
+      "before_crossing_pairs": 0,
+      "after_crossing_pairs": 0
+    },
+    {
+      "record": 3131,
+      "before_crossing_pairs": 0,
+      "after_crossing_pairs": 0
+    },
+    {
+      "record": 4874,
+      "before_crossing_pairs": 177,
+      "after_crossing_pairs": 0
+    },
+    {
+      "record": 4975,
+      "before_crossing_pairs": 0,
+      "after_crossing_pairs": 0
+    },
+    {
+      "record": 6291,
+      "before_crossing_pairs": 0,
+      "after_crossing_pairs": 0
+    },
+    {
+      "record": 8789,
+      "before_crossing_pairs": 0,
+      "after_crossing_pairs": 0
+    }
+  ]
+}
