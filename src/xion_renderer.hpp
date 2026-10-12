@@ -12,6 +12,7 @@
 #include "mods/svc/hook.h"
 #include "d/actor/d_a_alink.h"
 #include "d/actor/d_a_mirror.h"
+#include "local_player.hpp"
 #include "d/d_com_inf_game.h"
 #include "d/d_kankyo.h"
 #include "SSystem/SComponent/c_counter.h"
@@ -301,7 +302,7 @@ class System {
         bytes.assign(static_cast<const u8*>(buffer.data),static_cast<const u8*>(buffer.data)+buffer.size);return true;
     }
     bool compatible(daAlink_c* link) const {
-        if(!enabled_||!ready_||!link||link->checkWolf()||link->mClothesChangeWaitTimer||!link->mpLinkModel||!link->mpLinkFaceModel)return false;
+        if(!enabled_||!ready_||!local_player::is(link)||link->checkWolf()||link->mClothesChangeWaitTimer||!link->mpLinkModel||!link->mpLinkFaceModel)return false;
         auto* data=link->mpLinkModel->getModelData();auto* face=link->mpLinkFaceModel->getModelData();
         if(!data||data->getJointNum()!=kBodyBones||!face||face->getJointNum()!=kFaceBones)return false;
         // Outfit reloads and other model mods must not silently change the
@@ -385,6 +386,9 @@ public:
     }
     void reset() {current_=nullptr;gameplay_=nullptr;}
     void onExecute(daAlink_c* link) {
+        // Remote Crests actors/puppets must never reset or advance the local
+        // Xion cloth simulation.
+        if(!local_player::is(link))return;
         if(!clothReady_||!compatible(link)){resetCloth();return;}
         const u32 tick=g_Counter.mCounter0;
         if(clothOwner_!=link||clothBody_!=link->mpLinkModel||
@@ -414,7 +418,7 @@ public:
         // Texture pixels and model arrays stay allocated through host FIFO
         // retirement. The module's final destruction releases them after detach.
     }
-    void beginFrame(daAlink_c*) {reset();}
+    void beginFrame(daAlink_c* link) {if(local_player::is(link))reset();}
     void onDrawBufferReset(J3DDrawBuffer* buffer) {leases_.onBufferReset(buffer);}
     bool hasGameplayPacket() const {return enabled_&&ready_&&gameplay_&&gameplay_->valid;}
     bool ownsShadowModel(J3DModel* model) const {return hasGameplayPacket()&&gameplay_->matches(model);}

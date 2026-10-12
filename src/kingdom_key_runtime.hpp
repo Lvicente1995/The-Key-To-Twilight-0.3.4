@@ -1,6 +1,7 @@
 #pragma once
 #include "keyblade_arrays.hpp"
 #include "keyblade_highlight.hpp"
+#include "local_player.hpp"
 // Retains the v0.2.3g weapon features with v0.3.4 attribute/highlight
 // optimizations. Character selection remains independent. Included after host
 // service imports and native hook declarations.
@@ -24,6 +25,10 @@ V3 localAnchor;
 Chain chain;
 daAlink_c* owner=nullptr;
 J3DModel* ownerModel=nullptr;
+// Tracks the authoritative local Link draw so public modelDraw hooks do not
+// hijack Crests of Courage remote held-item/puppet rendering.
+daAlink_c* activeDrawOwner=nullptr;
+unsigned activeDrawDepth=0;
 bool held=false;
 Mtx simulatedParts[32]{};
 Mtx simulatedAnchor{};
@@ -125,7 +130,7 @@ void partMatrix(Mtx out,const Mtx base,const Part& part,V3 position,V3 direction
     out[0][3]=position.x;out[1][3]=position.y;out[2][3]=position.z;
 }
 bool active(daAlink_c* link) {
-    return enabled&&link&&link->mpSwAModel&&link->mSwordModel==link->mpSwAModel;
+    return enabled&&local_player::is(link)&&link->mpSwAModel&&link->mSwordModel==link->mpSwAModel;
 }
 std::vector<V3> restPose(const Mtx matrix) {
     std::vector<V3> result{transform(matrix,localAnchor)};
@@ -147,6 +152,7 @@ void resetPresence() {
     if(owner||chain.ready)clearInterpolation();
     presence.reset();summonEffects.reset();chain.ready=false;
     owner=nullptr;ownerModel=nullptr;hasHeldPose=false;held=false;
+    activeDrawOwner=nullptr;activeDrawDepth=0;
     shieldGesture.reset();shieldOwner=nullptr;shieldBody=nullptr;shieldModel=nullptr;
 }
 bool replaceEquipGesture(daAlink_c* link) {
@@ -173,6 +179,7 @@ bool shouldYieldShield(daAlink_c* link) {
 }
 HookAction onExecuteStart(ModContext*,void* args,void*,void*) {
     auto* link=mods::arg<daAlink_c*>(args,0);
+    if(!local_player::is(link))return HOOK_CONTINUE;
     ++gameTick;
     if(!shieldGesture.active())return HOOK_CONTINUE;
     if(link->checkNoResetFlg2(daAlink_c::FLG2_STATUS_WINDOW_DRAW))return HOOK_CONTINUE;
@@ -304,6 +311,9 @@ HookAction onSwordUnequipSpecial(ModContext*,void* args,void* result,void*) {
 }
 void onExecute(ModContext*,void* args,void*,void*) {
     auto* link=mods::arg<daAlink_c*>(args,0);
+    // A remote Crests player must never reset or take ownership of the local
+    // Keyblade simulation state.
+    if(!local_player::is(link))return;
     if(!active(link)||parts.empty()||link->checkWolf()) {resetPresence();return;}
     auto* model=link->mpSwAModel;
     auto* matrix=model->getBaseTRMtx();
@@ -541,9 +551,13 @@ size_t effectPacketIndex=0;
 KeybladePacket* gameplayPacket=nullptr;
 J3DModel* gameplaySword=nullptr;
 J3DModel* gameplaySheath=nullptr;
-
 HookAction queueModel(daAlink_c* link,J3DModel* model,bool hidden,bool preview) {
     if(!active(link)||parts.empty())return HOOK_CONTINUE;
+    const bool statusPreview=link->checkNoResetFlg2(daAlink_c::FLG2_STATUS_WINDOW_DRAW);
+    // Crests' held-item/puppet renderer can invoke Link model helpers outside
+    // the local player's own draw. Do not hijack those calls.
+    if(!preview&&(activeDrawOwner!=link||activeDrawDepth==0))return HOOK_CONTINUE;
+    if(preview&&!statusPreview&&(activeDrawOwner!=link||activeDrawDepth==0))return HOOK_CONTINUE;
     if(model==link->mpSwASheathModel)return HOOK_SKIP_ORIGINAL;
     if(model!=link->mpSwAModel)return HOOK_CONTINUE;
     if(link->checkWolf())return HOOK_SKIP_ORIGINAL;
@@ -581,6 +595,9 @@ HookAction onBasicModelDraw(ModContext*,void* args,void*,void*) {
 }
 HookAction onLinkDraw(ModContext*,void* args,void*,void*) {
     auto* link=mods::arg<daAlink_c*>(args,0);
+    if(!local_player::is(link))return HOOK_CONTINUE;
+    activeDrawOwner=link;
+    ++activeDrawDepth;
     gameplayPacket=nullptr;
     gameplaySword=active(link)?link->mpSwAModel:nullptr;
     gameplaySheath=active(link)?link->mpSwASheathModel:nullptr;
@@ -588,17 +605,25 @@ HookAction onLinkDraw(ModContext*,void* args,void*,void*) {
 }
 void onLinkDrawFinished(ModContext*,void* args,void*,void*) {
     auto* link=mods::arg<daAlink_c*>(args,0);
-    if(owner!=link||!active(link)||link->checkWolf()||!summonEffects.active()
-        ||link->checkNoResetFlg2(daAlink_c::FLG2_STATUS_WINDOW_DRAW))return;
-    auto& packet=effectPackets[effectPacketIndex++%effectPackets.size()];
-    packet.drawClear();packet.set(summonEffects.snapshot());
-    j3dSys.getDrawBuffer(1)->entryImm(&packet,0);
+    if(!local_player::is(link))return;
+    if(owner==link&&active(link)&&!link->checkWolf()&&summonEffects.active()
+        &&!link->checkNoResetFlg2(daAlink_c::FLG2_STATUS_WINDOW_DRAW)) {
+        if(auto* buffer=j3dSys.getDrawBuffer(1)) {
+            auto& packet=effectPackets[effectPacketIndex++%effectPackets.size()];
+            packet.drawClear();packet.set(summonEffects.snapshot());
+            buffer->entryImm(&packet,0);
+        }
+    }
+    if(activeDrawOwner==link&&activeDrawDepth) {
+        if(--activeDrawDepth==0)activeDrawOwner=nullptr;
+    }
 }
 HookAction onMirrorModelDraw(ModContext*,void* args,void*,void*) {
     auto* mirror=mods::arg<dMirror_packet_c*>(args,0);
     auto* model=mods::arg<J3DModel*>(args,1);
     auto* view=mods::arg<MtxP>(args,2);
     if(model!=gameplaySword||parts.empty())return HOOK_CONTINUE;
+    if(!mirror||!view)return HOOK_CONTINUE;
     if(!gameplayPacket)return HOOK_SKIP_ORIGINAL;
     const auto& base=model->getBaseTRMtx();
     V3 origin{base[0][3],base[1][3],base[2][3]};
@@ -609,7 +634,10 @@ HookAction onMirrorModelDraw(ModContext*,void* args,void*,void*) {
 void onShadowImageDraw(ModContext*,void* args,void*,void*) {
     auto* shadow=mods::arg<dDlst_shadowReal_c*>(args,0);
     auto* view=mods::arg<MtxP>(args,1);
-    if(!gameplaySword||parts.empty()) {ShadowImageDraw::g_orig(shadow,view);return;}
+    if(!shadow||!view)return;
+    if(!gameplaySword||parts.empty()||!shadow->mModelNum||shadow->mModelNum>38) {
+        ShadowImageDraw::g_orig(shadow,view);return;
+    }
     J3DModel* saved[38];std::memcpy(saved,shadow->mpModels,sizeof(saved));
     u8 savedCount=shadow->mModelNum;
     bool swordPresent=false;u8 retained=0;
