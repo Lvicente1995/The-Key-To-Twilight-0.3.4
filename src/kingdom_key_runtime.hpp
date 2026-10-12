@@ -2,6 +2,7 @@
 #include "keyblade_arrays.hpp"
 #include "keyblade_highlight.hpp"
 #include "local_player.hpp"
+#include "keyblade_render_mode.hpp"
 #include "aurora/gfx.h"
 // Retains the v0.2.3g weapon features with v0.3.4 attribute/highlight
 // optimizations. Character selection remains independent. Included after host
@@ -17,34 +18,35 @@ struct Part { std::string name;V3 pivot,tangent;std::vector<Vertex> vertices;std
 std::vector<Part> parts;
 highlight::MaterialCache highlightMaterials;
 bool staticArrayReadsPending=false;
-// Aurora has a separate 2 MiB per-frame index arena. Crests can bring that
-// arena close to exhaustion when multiple player models are visible. In that
-// situation keep the exact Kingdom Key geometry, but submit triangle vertices
-// through the regular GX stream so the draw uses vertex-arena headroom instead
-// of another large indexed allocation. This mode stays latched until the weapon
-// is dismissed so completed-frame statistics cannot make it oscillate.
-bool indexPressureFallback=false;
-constexpr std::uint32_t kIndexArenaBytes=2u*1024u*1024u;
-constexpr std::uint32_t kIndexSafetyReserve=96u*1024u;
-std::uint32_t keybladeIndexBytes() {
-    std::uint64_t bytes=0;
-    for(const auto& part:parts)bytes+=part.indices.size()*sizeof(u16);
-    return static_cast<std::uint32_t>(std::min<std::uint64_t>(bytes,0xffffffffu));
-}
-bool shouldEnterIndexPressureFallback() {
-    if(indexPressureFallback)return true;
+// Full-detail geometry remains available for solo play. A compact 3,076-triangle
+// runtime mesh is loaded alongside it for crowded multiplayer scenes. This avoids
+// waiting for previous-frame pressure statistics before the first held-weapon draw.
+std::vector<Part> safeParts;
+highlight::MaterialCache safeHighlightMaterials;
+KeybladeRenderMode renderMode=KeybladeRenderMode::Auto;
+bool safeRenderLatched=false;
+constexpr std::uint32_t kAutoSafeIndexThreshold=768u*1024u;
+
+bool shouldUseSafeRendering() {
+    if(renderMode==KeybladeRenderMode::MultiplayerSafe)return true;
+    if(renderMode==KeybladeRenderMode::FullDetail)return false;
+    if(safeRenderLatched)return true;
     const auto* stats=aurora_get_stats();
-    if(!stats)return false;
-    const std::uint64_t projected=std::uint64_t(stats->lastIndexSize)+keybladeIndexBytes()+kIndexSafetyReserve;
-    if(projected<=kIndexArenaBytes)return false;
-    indexPressureFallback=true;
-    if(svc_log) {
-        const std::string message="Kingdom Key: index-pressure fallback enabled (last frame "+
-            std::to_string(stats->lastIndexSize)+"/"+std::to_string(kIndexArenaBytes)+
-            " bytes; full weapon needs "+std::to_string(keybladeIndexBytes())+" index bytes).";
-        svc_log->info(mod_ctx,message.c_str());
+    if(stats&&stats->lastIndexSize>=kAutoSafeIndexThreshold) {
+        safeRenderLatched=true;
+        if(svc_log) {
+            const std::string message="Kingdom Key: Multiplayer Safe renderer auto-enabled (last completed frame indices="+
+                std::to_string(stats->lastIndexSize)+"/2097152 bytes).";
+            svc_log->info(mod_ctx,message.c_str());
+        }
     }
-    return true;
+    return safeRenderLatched;
+}
+void setRenderMode(KeybladeRenderMode mode) {
+    renderMode=mode;
+    safeRenderLatched=(mode==KeybladeRenderMode::MultiplayerSafe);
+    if(svc_log&&safeRenderLatched)
+        svc_log->info(mod_ctx,"Kingdom Key: Multiplayer Safe renderer forced by mod setting.");
 }
 void finishRenderingReads() {
     // GXSetArray keeps CPU pointers until the FIFO worker consumes them.
@@ -181,7 +183,7 @@ void clearInterpolation() {
 void resetPresence() {
     if(owner||chain.ready)clearInterpolation();
     presence.reset();summonEffects.reset();chain.ready=false;
-    indexPressureFallback=false;
+    safeRenderLatched=(renderMode==KeybladeRenderMode::MultiplayerSafe);
     owner=nullptr;ownerModel=nullptr;hasHeldPose=false;held=false;
     activeDrawOwner=nullptr;activeDrawDepth=0;
     shieldGesture.reset();shieldOwner=nullptr;shieldBody=nullptr;shieldModel=nullptr;
@@ -373,7 +375,7 @@ void onExecute(ModContext*,void* args,void*,void*) {
     owner=link;ownerModel=model;lastActorPosition=actorPosition;
     if(!nowHeld) {
         if(chain.ready)clearInterpolation();
-        chain.ready=false;held=false;indexPressureFallback=false;
+        chain.ready=false;held=false;safeRenderLatched=(renderMode==KeybladeRenderMode::MultiplayerSafe);
         return;
     }
     V3 anchor=transform(matrix,localAnchor);
@@ -417,6 +419,7 @@ public:
     dKy_tevstr_c lighting;
     bool interpolate=false;
     bool castsShadow=true;
+    bool safeRender=false;
     void presentationMatrices(Mtx out[32]) const {
         for(size_t i=0;i<parts.size();++i) {
             if(!interpolate||!svc_interp->lookup_replacement_mtx(simulatedParts[i],out[i]))
@@ -434,7 +437,9 @@ public:
     }
     void draw() override {drawInView(j3dSys.getViewMtx());}
     void drawInView(const Mtx drawView) {
-        if(parts.empty())return;
+        const auto& geometry=(safeRender&&!safeParts.empty())?safeParts:parts;
+        const auto& materials=(safeRender&&!safeParts.empty())?safeHighlightMaterials:highlightMaterials;
+        if(geometry.empty())return;
         Mtx world[32];presentationMatrices(world);
         j3dSys.reinitGX();
         J3DShape::resetVcdVatCache();
@@ -506,8 +511,8 @@ public:
         GXSetCoPlanar(GX_FALSE);
         GXSetClipMode(GX_CLIP_ENABLE);
         GXSetCurrentMtx(GX_PNMTX0);
-        for(size_t partIndex=0;partIndex<parts.size();++partIndex) {
-            const auto& part=parts[partIndex];
+        for(size_t partIndex=0;partIndex<geometry.size();++partIndex) {
+            const auto& part=geometry[partIndex];
             Mtx view;
             MTXConcat(drawView,world[partIndex],view);
             GXLoadPosMtxImm(view,GX_PNMTX0);
@@ -516,53 +521,24 @@ public:
             GXSetArray(GX_VA_POS,arrays.positions.data(),static_cast<u32>(arrays.positions.size()*sizeof(keyblade_arrays::Vector)),sizeof(keyblade_arrays::Vector),keyblade_arrays::littleEndian);
             GXSetArray(GX_VA_NRM,arrays.normals.data(),static_cast<u32>(arrays.normals.size()*sizeof(keyblade_arrays::Vector)),sizeof(keyblade_arrays::Vector),keyblade_arrays::littleEndian);
             GXSetArray(GX_VA_CLR0,arrays.colors.data(),static_cast<u32>(arrays.colors.size()*sizeof(keyblade_arrays::Color)),sizeof(keyblade_arrays::Color),keyblade_arrays::littleEndian);
-            // Static arrays move immutable geometry out of the 5 MiB vertex
-            // arena. Dynamic highlights remain direct/FIFO-owned, so camera or
-            // chain changes never require a blocking array-rewrite drain.
             staticArrayReadsPending=true;
-            const bool fifoFallback=shouldEnterIndexPressureFallback();
-            if(!fifoFallback) {
-                GXBeginIndexed(GX_VTXFMT0,static_cast<u16>(part.vertices.size()),part.indices.data(),static_cast<u32>(part.indices.size()));
-                for(size_t vertexIndex=0;vertexIndex<part.vertices.size();++vertexIndex) {
-                    const Vertex& x=part.vertices[vertexIndex];
-                    GXPosition1x16(static_cast<u16>(vertexIndex));
-                    GXNormal1x16(static_cast<u16>(vertexIndex));
-                    GXColor1x16(static_cast<u16>(vertexIndex));
-                    V3 n=unit(rotate(view,x.normal));
-                    V3 p=transform(view,x.position);
-                    const V3 rgb=highlight::evaluate(n,p,highlightMaterials[part.materialIndex[vertexIndex]],highlightLights);
-                    GXColor4u8(byte(rgb.x),byte(rgb.y),byte(rgb.z),255);
-                }
-                GXEnd();
-            } else {
-                // Preserve the exact mesh and material/highlight result. The only
-                // change is how triangle references reach Aurora: ordinary FIFO
-                // data instead of GXBeginIndexed's constrained index arena.
-                constexpr size_t maxBatch=65535; // divisible by three
-                size_t offset=0;
-                while(offset<part.indices.size()) {
-                    const size_t count=std::min(maxBatch,part.indices.size()-offset);
-                    GXBegin(GX_TRIANGLES,GX_VTXFMT0,static_cast<u16>(count));
-                    for(size_t nIndex=0;nIndex<count;++nIndex) {
-                        const u16 vertexIndex=part.indices[offset+nIndex];
-                        const Vertex& x=part.vertices[vertexIndex];
-                        GXPosition1x16(vertexIndex);
-                        GXNormal1x16(vertexIndex);
-                        GXColor1x16(vertexIndex);
-                        V3 n=unit(rotate(view,x.normal));
-                        V3 p=transform(view,x.position);
-                        const V3 rgb=highlight::evaluate(n,p,highlightMaterials[part.materialIndex[vertexIndex]],highlightLights);
-                        GXColor4u8(byte(rgb.x),byte(rgb.y),byte(rgb.z),255);
-                    }
-                    GXEnd();
-                    offset+=count;
-                }
+            GXBeginIndexed(GX_VTXFMT0,static_cast<u16>(part.vertices.size()),part.indices.data(),static_cast<u32>(part.indices.size()));
+            for(size_t vertexIndex=0;vertexIndex<part.vertices.size();++vertexIndex) {
+                const Vertex& x=part.vertices[vertexIndex];
+                GXPosition1x16(static_cast<u16>(vertexIndex));
+                GXNormal1x16(static_cast<u16>(vertexIndex));
+                GXColor1x16(static_cast<u16>(vertexIndex));
+                V3 n=unit(rotate(view,x.normal));
+                V3 p=transform(view,x.position);
+                const V3 rgb=highlight::evaluate(n,p,materials[part.materialIndex[vertexIndex]],highlightLights);
+                GXColor4u8(byte(rgb.x),byte(rgb.y),byte(rgb.z),255);
             }
+            GXEnd();
         }
         J3DShape::resetVcdVatCache();
     }
     void drawSilhouette(const Mtx shadowView) {
-        if(parts.empty()||!castsShadow)return;
+        if(safeRender||parts.empty()||!castsShadow)return;
         // Preserve the shadow pass's projection, channel mask, additive blend,
         // and TEVREG0 color. A full GX reset would erase other actors' shadows.
         Mtx world[32];presentationMatrices(world);
@@ -622,7 +598,8 @@ HookAction queueModel(daAlink_c* link,J3DModel* model,bool hidden,bool preview) 
     }
     auto& packet=packets[packetIndex++%packets.size()];
     packet.drawClear();
-    packet.castsShadow=preview||link->mEquipItem==0x103;
+    packet.safeRender=shouldUseSafeRendering();
+    packet.castsShadow=!packet.safeRender&&(preview||link->mEquipItem==0x103);
     // Populate native light objects exactly as the original model draw would do.
     g_env_light.setLightTevColorType_MAJI(model,&link->tevStr);
     packet.lighting=link->tevStr;
@@ -660,7 +637,7 @@ void onLinkDrawFinished(ModContext*,void* args,void*,void*) {
     auto* link=mods::arg<daAlink_c*>(args,0);
     if(!local_player::is(link))return;
     if(owner==link&&active(link)&&!link->checkWolf()&&summonEffects.active()
-        &&!indexPressureFallback
+        &&!shouldUseSafeRendering()
         &&!link->checkNoResetFlg2(daAlink_c::FLG2_STATUS_WINDOW_DRAW)) {
         if(auto* buffer=j3dSys.getDrawBuffer(1)) {
             auto& packet=effectPackets[effectPacketIndex++%effectPackets.size()];
@@ -678,9 +655,9 @@ HookAction onMirrorModelDraw(ModContext*,void* args,void*,void*) {
     auto* view=mods::arg<MtxP>(args,2);
     if(model!=gameplaySword||parts.empty())return HOOK_CONTINUE;
     if(!mirror||!view)return HOOK_CONTINUE;
-    // Under index pressure use the native, cheap sword reflection rather than
-    // submitting another full custom Kingdom Key view.
-    if(indexPressureFallback)return HOOK_CONTINUE;
+    // Multiplayer Safe deliberately omits the weapon reflection rather than
+    // submitting another custom mesh pass or reflecting the native Ordon Sword.
+    if(shouldUseSafeRendering())return HOOK_SKIP_ORIGINAL;
     if(!gameplayPacket)return HOOK_SKIP_ORIGINAL;
     const auto& base=model->getBaseTRMtx();
     V3 origin{base[0][3],base[1][3],base[2][3]};
@@ -692,9 +669,9 @@ void onShadowImageDraw(ModContext*,void* args,void*,void*) {
     auto* shadow=mods::arg<dDlst_shadowReal_c*>(args,0);
     auto* view=mods::arg<MtxP>(args,1);
     if(!shadow||!view)return;
-    // A full custom silhouette is another complete indexed weapon submission.
-    // In crowded multiplayer frames retain the game's native inexpensive shadow.
-    if(indexPressureFallback) {ShadowImageDraw::g_orig(shadow,view);return;}
+    // Multiplayer Safe omits the custom weapon silhouette. Keeping the original
+    // native sword in this pass would show the wrong weapon shape, so remove it
+    // below and do not submit another Kingdom Key mesh.
     if(!gameplaySword||parts.empty()||!shadow->mModelNum||shadow->mModelNum>38) {
         ShadowImageDraw::g_orig(shadow,view);return;
     }
@@ -708,6 +685,7 @@ void onShadowImageDraw(ModContext*,void* args,void*,void*) {
     shadow->mModelNum=retained;
     if(retained)ShadowImageDraw::g_orig(shadow,view);
     shadow->mModelNum=savedCount;std::memcpy(shadow->mpModels,saved,sizeof(saved));
+    if(shouldUseSafeRendering())return;
     if(!swordPresent||!gameplayPacket||!gameplayPacket->castsShadow)return;
     // These keys are the game's documented-in-source shadow matrix keys. The
     // public interpolation service explicitly permits looking up game keys.
@@ -725,16 +703,17 @@ public:
     bool read(void* target,size_t n) {if(n>remaining)return false;std::memcpy(target,data,n);data+=n;remaining-=n;return true;}
     template<class T>bool read(T& value) {return read(&value,sizeof(value));}
 };
-bool loadMesh() {
+bool loadMeshResource(const char* resourceName,std::vector<Part>& output,
+                      highlight::MaterialCache& materials,V3& anchorOut) {
     ResourceBuffer buffer=RESOURCE_BUFFER_INIT;
-    if(svc_resource->load(mod_ctx,"kingdom_key.mesh",&buffer)!=MOD_OK)return false;
+    if(svc_resource->load(mod_ctx,resourceName,&buffer)!=MOD_OK)return false;
     struct ReleaseResource {
         ResourceBuffer& buffer;
         ~ReleaseResource() {svc_resource->free(mod_ctx,&buffer);}
     } release{buffer};
     Reader r{static_cast<const unsigned char*>(buffer.data),buffer.size};
-    char magic[8];uint32_t count=0;
-    bool okay=r.read(magic,8)&&std::memcmp(magic,"KKMESH02",8)==0&&r.read(count)&&count>=3&&count<=32&&r.read(localAnchor);
+    char magic[8];uint32_t count=0;V3 anchor{};
+    bool okay=r.read(magic,8)&&std::memcmp(magic,"KKMESH02",8)==0&&r.read(count)&&count>=3&&count<=32&&r.read(anchor);
     std::vector<Part> loaded;
     highlight::MaterialCache loadedMaterials;
     for(uint32_t i=0;okay&&i<count;++i) {
@@ -752,8 +731,6 @@ bool loadMesh() {
             for(int j=0;j<12;++j)if(!std::isfinite(f[j]))okay=false;
         }
         if(!okay)break;
-        // Deduplicate bit-identical complete vertices, retaining material and
-        // normal seams. No positions, triangles or surface detail are removed.
         std::unordered_map<std::string,u16> indexByVertex;
         std::vector<Vertex> unique;
         part.indices.reserve(part.vertices.size());
@@ -779,8 +756,30 @@ bool loadMesh() {
         loaded.push_back(std::move(part));
     }
     okay=okay&&r.remaining==0&&loaded.size()==count&&loaded.front().name=="rigid"&&loaded.back().name=="charm";
-    if(okay){finishRenderingReads();parts=std::move(loaded);highlightMaterials=std::move(loadedMaterials);}
-    return okay;
+    if(!okay)return false;
+    output=std::move(loaded);materials=std::move(loadedMaterials);anchorOut=anchor;
+    return true;
+}
+bool loadMesh() {
+    std::vector<Part> fullLoaded,safeLoaded;
+    highlight::MaterialCache fullMaterials,safeMaterials;
+    V3 fullAnchor{},safeAnchor{};
+    if(!loadMeshResource("kingdom_key.mesh",fullLoaded,fullMaterials,fullAnchor))return false;
+    if(!loadMeshResource("kingdom_key_safe.mesh",safeLoaded,safeMaterials,safeAnchor))return false;
+    if(fullLoaded.size()!=safeLoaded.size())return false;
+    auto close=[](float a,float b){return std::abs(a-b)<0.001f;};
+    if(!close(fullAnchor.x,safeAnchor.x)||!close(fullAnchor.y,safeAnchor.y)||!close(fullAnchor.z,safeAnchor.z))return false;
+    for(size_t i=0;i<fullLoaded.size();++i) {
+        if(fullLoaded[i].name!=safeLoaded[i].name)return false;
+        if(!close(fullLoaded[i].pivot.x,safeLoaded[i].pivot.x)||
+           !close(fullLoaded[i].pivot.y,safeLoaded[i].pivot.y)||
+           !close(fullLoaded[i].pivot.z,safeLoaded[i].pivot.z))return false;
+    }
+    finishRenderingReads();
+    parts=std::move(fullLoaded);highlightMaterials=std::move(fullMaterials);
+    safeParts=std::move(safeLoaded);safeHighlightMaterials=std::move(safeMaterials);
+    localAnchor=fullAnchor;
+    return true;
 }
 
 // Assets remain resident across choices. In particular audio resource additions

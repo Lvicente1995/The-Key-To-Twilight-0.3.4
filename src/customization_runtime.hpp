@@ -14,7 +14,7 @@ std::string keybladeError;
 std::string keybladeWarning;
 std::string characterError;
 std::string characterVoiceWarning;
-selections::Selection applied{KeybladeSelection::None,CharacterSelection::None};
+selections::Selection applied{KeybladeSelection::None,CharacterSelection::None,KeybladeRenderMode::Auto};
 
 void initializeAssets() {
     namespace kk=keyblade_runtime;
@@ -46,6 +46,7 @@ void initializeAssets() {
         kk::finishRenderingReads();
         kh3fx::clearAssets();
         kk::parts.clear();
+        kk::safeParts.clear();
         svc_log->warn(mod_ctx,keybladeError.c_str());
     }
     try {
@@ -71,6 +72,10 @@ void initializeAssets() {
 
 void apply(const selections::Selection& requested) {
     namespace kk=keyblade_runtime;
+    if(requested.rendering!=applied.rendering) {
+        kk::setRenderMode(requested.rendering);
+        applied.rendering=requested.rendering;
+    }
     if(requested.keyblade!=applied.keyblade) {
         kk::deactivate();
         applied.keyblade=KeybladeSelection::None;
@@ -100,7 +105,11 @@ void apply(const selections::Selection& requested) {
         if(!status.empty())status+='\n';
         status+=characterError+" Using Link. Repair the assets and reload the mod.";
     }
-    if(status.empty())status="Selections apply immediately. Armor abilities stay unchanged.";
+    if(status.empty()) {
+        status="Selections apply immediately. Armor abilities stay unchanged.";
+        if(applied.keyblade==KeybladeSelection::KingdomKey&&applied.rendering==KeybladeRenderMode::MultiplayerSafe)
+            status+=" Multiplayer Safe uses the compact Kingdom Key and omits extra weapon shadow/reflection/summon mesh passes.";
+    }
     if(applied.keyblade==KeybladeSelection::KingdomKey&&!keybladeWarning.empty())
         status+='\n'+keybladeWarning;
     if(applied.character==CharacterSelection::Xion&&!characterVoiceWarning.empty())
@@ -133,8 +142,9 @@ void shutdown() {
     keyblade_runtime::finishRenderingReads();
     kh3fx::clearAssets();
     keyblade_runtime::parts.clear();
+    keyblade_runtime::safeParts.clear();
     keybladeAssetsReady=characterAssetsReady=false;
-    applied={KeybladeSelection::None,CharacterSelection::None};
+    applied={KeybladeSelection::None,CharacterSelection::None,KeybladeRenderMode::Auto};
     keybladeWarning.clear();
     characterVoiceWarning.clear();
 }

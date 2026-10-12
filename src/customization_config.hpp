@@ -4,6 +4,7 @@
 #include "mods/svc/ui.h"
 #include "character_selection.hpp"
 #include "keyblade_selection.hpp"
+#include "keyblade_render_mode.hpp"
 
 #include <string>
 #include <string_view>
@@ -13,6 +14,7 @@ namespace kingdom::selections {
 struct Selection {
     KeybladeSelection keyblade = KeybladeSelection::KingdomKey;
     CharacterSelection character = CharacterSelection::None;
+    KeybladeRenderMode rendering = KeybladeRenderMode::Auto;
     bool operator==(const Selection&) const = default;
 };
 
@@ -23,8 +25,8 @@ class System {
     ModContext* context_ = nullptr;
     const ConfigService* config_ = nullptr;
     const UiService* ui_ = nullptr;
-    ConfigVarHandle keyblade_ = 0, character_ = 0;
-    ConfigSubscriptionHandle keybladeSubscription_ = 0, characterSubscription_ = 0;
+    ConfigVarHandle keyblade_ = 0, character_ = 0, rendering_ = 0;
+    ConfigSubscriptionHandle keybladeSubscription_ = 0, characterSubscription_ = 0, renderingSubscription_ = 0;
     UiElementHandle statusRow_ = 0;
     Selection requested_{};
     std::string status_ = "Choose a Keyblade and a character independently.";
@@ -43,6 +45,9 @@ class System {
         } else if (var == self.character_) {
             valid = validCharacterSelection(value->int_value);
             self.requested_.character = characterSelectionFromId(value->int_value);
+        } else if (var == self.rendering_) {
+            valid = validKeybladeRenderMode(value->int_value);
+            self.requested_.rendering = keybladeRenderModeFromId(value->int_value);
         } else {
             return;
         }
@@ -84,6 +89,15 @@ class System {
         result = self.ui_->pane_add_control(self.context_, pane, &control, nullptr);
         if (result != MOD_OK)
             return mods::set_error(error, result, "Could not build the character choice.");
+
+        control.label = "Keyblade Rendering";
+        control.config_var = self.rendering_;
+        control.options = kKeybladeRenderOptions;
+        control.option_count = sizeof(kKeybladeRenderOptions) / sizeof(*kKeybladeRenderOptions);
+        control.tooltip = "Multiplayer Safe uses a lightweight Kingdom Key and omits extra weapon render passes for crowded Crests of Courage scenes.";
+        result = self.ui_->pane_add_control(self.context_, pane, &control, nullptr);
+        if (result != MOD_OK)
+            return mods::set_error(error, result, "Could not build the Keyblade rendering choice.");
 
         result = self.ui_->pane_add_text(self.context_, pane, self.status_.c_str(), &self.statusRow_);
         self.statusDirty_ = result != MOD_OK;
@@ -137,24 +151,33 @@ public:
         desc.default_int = static_cast<int64_t>(CharacterSelection::None);
         if (config_->register_var(context_, &desc, &character_) != MOD_OK || !character_)
             return fail(error, "Could not register the character setting.");
+        desc.name = "keyblade_rendering";
+        desc.default_int = static_cast<int64_t>(KeybladeRenderMode::Auto);
+        if (config_->register_var(context_, &desc, &rendering_) != MOD_OK || !rendering_)
+            return fail(error, "Could not register the Keyblade rendering setting.");
 
         // Saved values and --cvar overrides are applied silently at registration.
         // Always read them before installing subscriptions or reporting a choice.
-        int64_t keyblade = 0, character = 0;
+        int64_t keyblade = 0, character = 0, rendering = 0;
         if (config_->get_int(context_, keyblade_, &keyblade) != MOD_OK ||
-            config_->get_int(context_, character_, &character) != MOD_OK)
+            config_->get_int(context_, character_, &character) != MOD_OK ||
+            config_->get_int(context_, rendering_, &rendering) != MOD_OK)
             return fail(error, "Could not read the saved customization settings.");
         if ((!validKeybladeSelection(keyblade) &&
              config_->set_int(context_, keyblade_, 0) != MOD_OK) ||
             (!validCharacterSelection(character) &&
-             config_->set_int(context_, character_, 0) != MOD_OK))
+             config_->set_int(context_, character_, 0) != MOD_OK) ||
+            (!validKeybladeRenderMode(rendering) &&
+             config_->set_int(context_, rendering_, 0) != MOD_OK))
             return fail(error, "Could not restore a valid customization choice.");
-        requested_ = {keybladeSelectionFromId(keyblade), characterSelectionFromId(character)};
+        requested_ = {keybladeSelectionFromId(keyblade), characterSelectionFromId(character), keybladeRenderModeFromId(rendering)};
 
         if (config_->subscribe(context_, keyblade_, changed, this, &keybladeSubscription_) != MOD_OK ||
             !keybladeSubscription_ ||
             config_->subscribe(context_, character_, changed, this, &characterSubscription_) != MOD_OK ||
-            !characterSubscription_)
+            !characterSubscription_ ||
+            config_->subscribe(context_, rendering_, changed, this, &renderingSubscription_) != MOD_OK ||
+            !renderingSubscription_)
             return fail(error, "Could not watch customization changes.");
 
         ready_ = true;
@@ -194,18 +217,20 @@ public:
     void shutdown() noexcept {
         ready_ = false;
         if (config_ && context_) {
+            if (renderingSubscription_) config_->unsubscribe(context_, renderingSubscription_);
             if (characterSubscription_) config_->unsubscribe(context_, characterSubscription_);
             if (keybladeSubscription_) config_->unsubscribe(context_, keybladeSubscription_);
+            if (rendering_) config_->unregister_var(context_, rendering_);
             if (character_) config_->unregister_var(context_, character_);
             if (keyblade_) config_->unregister_var(context_, keyblade_);
         }
-        keyblade_ = character_ = 0;
-        keybladeSubscription_ = characterSubscription_ = 0;
+        keyblade_ = character_ = rendering_ = 0;
+        keybladeSubscription_ = characterSubscription_ = renderingSubscription_ = 0;
         context_ = nullptr;
         config_ = nullptr;
         ui_ = nullptr;
         statusRow_ = 0;
-        requested_ = {KeybladeSelection::None, CharacterSelection::None};
+        requested_ = {KeybladeSelection::None, CharacterSelection::None, KeybladeRenderMode::Auto};
         pending_ = false;
         statusDirty_ = true;
     }
